@@ -6,76 +6,105 @@
 
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
   <script>
-  AFRAME.registerComponent('drag-rotate-active-marker', {
-    init: function () {
-      const scene = this.el;
-      this.activeModel = null;
-      this.dragging = false;
+    AFRAME.registerComponent('center-gltf-in-pivot', {
+      init: function () {
+        this.el.addEventListener('model-loaded', () => {
+          const mesh = this.el.getObject3D('mesh');
+          const pivotElement = this.el.parentEl;
 
-      this.onDown = (event) => {
-        if (!this.activeModel) return;
+          if (!mesh || !pivotElement) return;
 
-        this.dragging = true;
-        this.lastX = event.clientX;
-        this.lastY = event.clientY;
-        event.preventDefault();
-      };
+          const pivot = pivotElement.object3D;
 
-      this.onMove = (event) => {
-        if (!this.dragging || !this.activeModel) return;
+          pivot.updateMatrixWorld(true);
+          this.el.object3D.updateMatrixWorld(true);
 
-        const deltaX = event.clientX - this.lastX;
-        const deltaY = event.clientY - this.lastY;
+          const bounds = new THREE.Box3().setFromObject(mesh);
+          const centerWorld = bounds.getCenter(new THREE.Vector3());
+          const centerInPivot = pivot.worldToLocal(centerWorld.clone());
 
-        // Arrastar para os lados gira no eixo Y;
-        // arrastar para cima ou para baixo gira no eixo X.
-        this.activeModel.rotateY(deltaX * 0.01);
-        this.activeModel.rotateX(deltaY * 0.01);
-
-        this.lastX = event.clientX;
-        this.lastY = event.clientY;
-      };
-
-      this.onUp = () => {
-        this.dragging = false;
-      };
-
-      this.attachControls = () => {
-        scene.querySelectorAll('a-marker').forEach((marker) => {
-          const model = marker.querySelector('[gltf-model]');
-          if (!model) return;
-
-          marker.addEventListener('markerFound', () => {
-            this.activeModel = model.object3D;
-          });
-
-          marker.addEventListener('markerLost', () => {
-            if (this.activeModel === model.object3D) {
-              this.activeModel = null;
-              this.dragging = false;
-            }
-          });
+          this.el.object3D.position.sub(centerInPivot);
         });
-
-        const canvas = scene.canvas;
-        if (!canvas) return;
-
-        canvas.style.touchAction = 'none';
-        canvas.addEventListener('pointerdown', this.onDown);
-        window.addEventListener('pointermove', this.onMove);
-        window.addEventListener('pointerup', this.onUp);
-        window.addEventListener('pointercancel', this.onUp);
-      };
-
-      if (scene.hasLoaded) {
-        this.attachControls();
-      } else {
-        scene.addEventListener('loaded', this.attachControls, { once: true });
       }
-    }
-  });
-</script>
+    });
+
+    AFRAME.registerComponent('drag-rotate-active-marker', {
+      init: function () {
+        const scene = this.el;
+
+        this.activeModel = null;
+        this.dragging = false;
+
+        this.onDown = (event) => {
+          if (!this.activeModel) return;
+
+          this.dragging = true;
+          this.lastX = event.clientX;
+          this.lastY = event.clientY;
+          event.preventDefault();
+        };
+
+        this.onMove = (event) => {
+          if (!this.dragging || !this.activeModel) return;
+
+          const deltaX = event.clientX - this.lastX;
+          const deltaY = event.clientY - this.lastY;
+
+          // Arrastar para os lados gira no eixo Y.
+          // Arrastar para cima ou para baixo gira no eixo X.
+          this.activeModel.rotateY(deltaX * 0.01);
+          this.activeModel.rotateX(deltaY * 0.01);
+
+          this.lastX = event.clientX;
+          this.lastY = event.clientY;
+        };
+
+        this.onUp = () => {
+          this.dragging = false;
+        };
+
+        this.attachControls = () => {
+          scene.querySelectorAll('a-marker').forEach((marker) => {
+            const model = marker.querySelector('[gltf-model]');
+            if (!model) return;
+
+            const rotationTarget =
+              model.parentEl && model.parentEl.hasAttribute('data-pivot')
+                ? model.parentEl.object3D
+                : model.object3D;
+
+            marker.addEventListener('markerFound', () => {
+              this.activeModel = rotationTarget;
+            });
+
+            marker.addEventListener('markerLost', () => {
+              if (this.activeModel === rotationTarget) {
+                this.activeModel = null;
+                this.dragging = false;
+              }
+            });
+          });
+
+          const canvas = scene.canvas;
+          if (!canvas) return;
+
+          canvas.style.touchAction = 'none';
+          canvas.addEventListener('pointerdown', this.onDown);
+          window.addEventListener('pointermove', this.onMove);
+          window.addEventListener('pointerup', this.onUp);
+          window.addEventListener('pointercancel', this.onUp);
+        };
+
+        if (scene.hasLoaded) {
+          this.attachControls();
+        } else {
+          scene.addEventListener('loaded', this.attachControls, { once: true });
+        }
+      }
+    });
+  </script>
 </head>
 
 <body style="margin: 0; overflow: hidden;">
@@ -87,33 +116,48 @@
     renderer="logarithmicDepthBuffer: true;">
 
     <!-- Modelagem KKKK -->
-    <a-marker type="pattern" url="./pattern-kkkk.patt" emitevents="true">
-      <a-entity position="0 0 0" scale="0.20 0.20 0.20">
+    <a-marker
+      type="pattern"
+      url="./pattern-kkkk.patt"
+      emitevents="true">
+
+      <a-entity
+        data-pivot
+        position="0 0 0"
+        scale="0.17 0.17 0.17">
+
         <a-entity
           position="0 0 0"
           gltf-model="./kkkk/scene.gltf"
-          >
+          center-gltf-in-pivot>
         </a-entity>
+
       </a-entity>
     </a-marker>
 
     <!-- Modelagem Mascote -->
-    <a-marker type="pattern" url="./pattern-mascote.patt" emitevents="true">
+    <a-marker
+      type="pattern"
+      url="./pattern-mascote.patt"
+      emitevents="true">
+
       <a-entity
         position="0 0 0"
         scale="4 4 4"
-        gltf-model="./mascote/2441948.gltf"
-        >
+        gltf-model="./mascote/2441948.gltf">
       </a-entity>
     </a-marker>
 
     <!-- Modelagem Guaracuí -->
-    <a-marker type="pattern" url="./pattern-Guaracui.patt" emitevents="true">
+    <a-marker
+      type="pattern"
+      url="./pattern-Guaracui.patt"
+      emitevents="true">
+
       <a-entity
         position="0 0 0"
         scale="0.20 0.20 0.20"
-        gltf-model="./guaracui/2441949.gltf"
-        >
+        gltf-model="./guaracui/2441949.gltf">
       </a-entity>
     </a-marker>
 
