@@ -1,55 +1,52 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-  <body style="margin : 0px; overflow: hidden;">
-    <a-scene 
-      embedded 
-      arjs='sourceType: webcam; debugUIEnabled: false;' 
-      vr-mode-ui="enabled: false" 
-      renderer="logarithmicDepthBuffer: true;"
-    >
+</head>
+
+<body style="margin: 0; overflow: hidden;">
+  <a-scene
+    embedded
+    arjs="sourceType: webcam; debugUIEnabled: false;"
+    vr-mode-ui="enabled: false"
+    renderer="logarithmicDepthBuffer: true;">
 
     <!-- Modelagem KKKK -->
-     <a-marker type="pattern" url="./pattern-kkkk.patt">
-        
+    <a-marker type="pattern" url="./pattern-kkkk.patt">
+      <a-entity position="0 0 0" scale="0.05 0.05 0.05">
         <a-entity
-          position="0 0 0"
-          scale="0.05 0.05 0.05"
-        >
-          <a-entity
-            position="-19 0 -1"  gltf-model="./kkkk/scene.gltf"
-          ></a-entity>
-        
+          position="-19 0 -1"
+          gltf-model="./kkkk/scene.gltf"
+          animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear">
         </a-entity>
+      </a-entity>
+    </a-marker>
 
-      </a-marker>
-
-      
     <!-- Modelagem Mascote -->
-      <a-marker type="pattern" url="./pattern-mascote.patt">
-        
-        <a-entity
-          position="0 0 0"
-          scale="4 4 4"
-          gltf-model="./mascote/2441948.gltf"
-        ></a-entity>
+    <a-marker type="pattern" url="./pattern-mascote.patt">
+      <a-entity
+        position="0 0 0"
+        scale="4 4 4"
+        gltf-model="./mascote/2441948.gltf"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear">
+      </a-entity>
+    </a-marker>
 
-      </a-marker>
+    <!-- Modelagem Guaracuí -->
+    <a-marker type="pattern" url="./pattern-Guaracui.patt">
+      <a-entity
+        position="0 0 0"
+        scale="0.20 0.20 0.20"
+        gltf-model="./guaracui/2441949.gltf"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear">
+      </a-entity>
+    </a-marker>
 
-       <!-- Modelagem Guaracuí -->
-      <a-marker type="pattern" url="./pattern-Guaracui.patt">
-        
-        <a-entity
-          position="0 0 0"
-          scale="0.20 0.20 0.20"
-          gltf-model="./guaracui/2441949.gltf"
-        ></a-entity>
-
-      </a-marker>
-
-
-      <a-entity camera></a-entity>
-    </a-scene>
-  </body>
+    <a-entity camera></a-entity>
+  </a-scene>
+</body>
 </html>
