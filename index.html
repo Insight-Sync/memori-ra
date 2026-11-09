@@ -6,43 +6,113 @@
 
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <script>
+  AFRAME.registerComponent('drag-rotate-active-marker', {
+    init: function () {
+      const scene = this.el;
+      this.activeModel = null;
+      this.dragging = false;
+
+      this.onDown = (event) => {
+        if (!this.activeModel) return;
+
+        this.dragging = true;
+        this.lastX = event.clientX;
+        this.lastY = event.clientY;
+        event.preventDefault();
+      };
+
+      this.onMove = (event) => {
+        if (!this.dragging || !this.activeModel) return;
+
+        const deltaX = event.clientX - this.lastX;
+        const deltaY = event.clientY - this.lastY;
+
+        // Arrastar para os lados gira no eixo Y;
+        // arrastar para cima ou para baixo gira no eixo X.
+        this.activeModel.rotateY(deltaX * 0.01);
+        this.activeModel.rotateX(deltaY * 0.01);
+
+        this.lastX = event.clientX;
+        this.lastY = event.clientY;
+      };
+
+      this.onUp = () => {
+        this.dragging = false;
+      };
+
+      this.attachControls = () => {
+        scene.querySelectorAll('a-marker').forEach((marker) => {
+          const model = marker.querySelector('[gltf-model]');
+          if (!model) return;
+
+          marker.addEventListener('markerFound', () => {
+            this.activeModel = model.object3D;
+          });
+
+          marker.addEventListener('markerLost', () => {
+            if (this.activeModel === model.object3D) {
+              this.activeModel = null;
+              this.dragging = false;
+            }
+          });
+        });
+
+        const canvas = scene.canvas;
+        if (!canvas) return;
+
+        canvas.style.touchAction = 'none';
+        canvas.addEventListener('pointerdown', this.onDown);
+        window.addEventListener('pointermove', this.onMove);
+        window.addEventListener('pointerup', this.onUp);
+        window.addEventListener('pointercancel', this.onUp);
+      };
+
+      if (scene.hasLoaded) {
+        this.attachControls();
+      } else {
+        scene.addEventListener('loaded', this.attachControls, { once: true });
+      }
+    }
+  });
+</script>
 </head>
 
 <body style="margin: 0; overflow: hidden;">
   <a-scene
     embedded
+    drag-rotate-active-marker
     arjs="sourceType: webcam; debugUIEnabled: false;"
     vr-mode-ui="enabled: false"
     renderer="logarithmicDepthBuffer: true;">
 
     <!-- Modelagem KKKK -->
-    <a-marker type="pattern" url="./pattern-kkkk.patt">
-      <a-entity position="0 0 0" scale="0.05 0.05 0.05">
-        <a-entity
-          position="-19 0 -1"
-          gltf-model="./kkkk/scene.gltf"
-          animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear">
-        </a-entity>
-      </a-entity>
-    </a-marker>
+    <a-marker type="pattern" url="./pattern-kkkk.patt" emitevents="true">
+    <a-entity position="0 0 0" scale="0.005 0.005 0.005">
+    <a-entity
+      position="0 0 0"
+      gltf-model="./kkkk/scene.gltf">
+    </a-entity>
+  </a-entity>
+</a-marker>
 
     <!-- Modelagem Mascote -->
-    <a-marker type="pattern" url="./pattern-mascote.patt">
+    <a-marker type="pattern" url="./pattern-mascote.patt" emitevents="true">
       <a-entity
         position="0 0 0"
         scale="4 4 4"
         gltf-model="./mascote/2441948.gltf"
-        animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear">
+        >
       </a-entity>
     </a-marker>
 
     <!-- Modelagem Guaracuí -->
-    <a-marker type="pattern" url="./pattern-Guaracui.patt">
+    <a-marker type="pattern" url="./pattern-Guaracui.patt" emitevents="true">
       <a-entity
         position="0 0 0"
         scale="0.20 0.20 0.20"
         gltf-model="./guaracui/2441949.gltf"
-        animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear">
+        >
       </a-entity>
     </a-marker>
 
