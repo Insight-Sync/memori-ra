@@ -15,6 +15,7 @@
       height: 100%;
       overflow: hidden;
       background: #000;
+      touch-action: none;
     }
 
     .a-enter-vr, .a-enter-ar {
@@ -46,144 +47,140 @@
     });
 
     AFRAME.registerComponent('drag-rotate-active-marker', {
-      init: function () {
-        const scene = this.el;
+  init: function () {
+    const scene = this.el;
 
-        this.activeModel = null;
-        this.baseScale = 1;
-        this.dragging = false;
-        this.pointers = new Map();
-        this.lastPinchDist = 0;
+    this.activeModel = null;
+    this.baseScale = 1;
+    this.mode = null; 
+    this.lastX = 0;
+    this.lastY = 0;
+    this.lastDist = 0;
 
-        const MIN_ZOOM = 0.3; 
-        const MAX_ZOOM = 5;   
+    const MIN_ZOOM = 0.3; 
+    const MAX_ZOOM = 5;   
 
-        this.applyZoom = (factor) => {
-          if (!this.activeModel) return;
-          const current = this.activeModel.scale.x;
-          let next = current * factor;
-          next = Math.min(this.baseScale * MAX_ZOOM, Math.max(this.baseScale * MIN_ZOOM, next));
-          this.activeModel.scale.setScalar(next);
-        };
+    const touchDist = (t) =>
+      Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
 
-        this.pinchDistance = () => {
-          const pts = Array.from(this.pointers.values());
-          return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-        };
+    this.applyZoom = (factor) => {
+      if (!this.activeModel) return;
+      let next = this.activeModel.scale.x * factor;
+      next = Math.min(this.baseScale * MAX_ZOOM, Math.max(this.baseScale * MIN_ZOOM, next));
+      this.activeModel.scale.setScalar(next);
+    };
 
-        this.onDown = (event) => {
-          if (!this.activeModel) return;
+    this.onTouchStart = (e) => {
+      if (!this.activeModel) return;
+      e.preventDefault();
 
-          this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-
-          if (this.pointers.size === 1) {
-            this.dragging = true;
-            this.lastX = event.clientX;
-            this.lastY = event.clientY;
-          } else if (this.pointers.size === 2) {
-            this.dragging = false;
-            this.lastPinchDist = this.pinchDistance();
-          }
-          event.preventDefault();
-        };
-
-        this.onMove = (event) => {
-          if (!this.activeModel || !this.pointers.has(event.pointerId)) return;
-
-          this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-
-
-          if (this.pointers.size >= 2) {
-            const dist = this.pinchDistance();
-            if (this.lastPinchDist > 0) {
-              this.applyZoom(dist / this.lastPinchDist);
-            }
-            this.lastPinchDist = dist;
-            return;
-          }
-
-
-          if (!this.dragging) return;
-
-          const deltaX = event.clientX - this.lastX;
-          const deltaY = event.clientY - this.lastY;
-
-
-          this.activeModel.rotateY(deltaX * 0.01);
-          this.activeModel.rotateX(deltaY * 0.01);
-
-          this.lastX = event.clientX;
-          this.lastY = event.clientY;
-        };
-
-        this.onUp = (event) => {
-          this.pointers.delete(event.pointerId);
-
-          if (this.pointers.size === 1) {
-
-            const p = Array.from(this.pointers.values())[0];
-            this.lastX = p.x;
-            this.lastY = p.y;
-            this.dragging = true;
-          } else if (this.pointers.size === 0) {
-            this.dragging = false;
-          }
-          this.lastPinchDist = 0;
-        };
-
-
-        this.onWheel = (event) => {
-          if (!this.activeModel) return;
-          event.preventDefault();
-          this.applyZoom(event.deltaY < 0 ? 1.1 : 0.9);
-        };
-
-        this.attachControls = () => {
-          scene.querySelectorAll('a-marker').forEach((marker) => {
-            const model = marker.querySelector('[gltf-model]');
-            if (!model) return;
-
-            const rotationTarget =
-              model.parentEl && model.parentEl.hasAttribute('data-pivot')
-                ? model.parentEl.object3D
-                : model.object3D;
-
-
-            const originalScale = rotationTarget.scale.x;
-
-            marker.addEventListener('markerFound', () => {
-              this.activeModel = rotationTarget;
-              this.baseScale = originalScale;
-            });
-
-            marker.addEventListener('markerLost', () => {
-              if (this.activeModel === rotationTarget) {
-                this.activeModel = null;
-                this.dragging = false;
-                this.pointers.clear();
-                this.lastPinchDist = 0;
-              }
-            });
-          });
-
-          const canvas = scene.canvas;
-          if (!canvas) return;
-
-          canvas.style.touchAction = 'none';
-          canvas.addEventListener('pointerdown', this.onDown);
-          canvas.addEventListener('wheel', this.onWheel, { passive: false });
-          window.addEventListener('pointermove', this.onMove);
-          window.addEventListener('pointerup', this.onUp);
-          window.addEventListener('pointercancel', this.onUp);
-        };
-
-        if (scene.hasLoaded) {
-          this.attachControls();
-        } else {
-          scene.addEventListener('loaded', this.attachControls, { once: true });
-        }
+      if (e.touches.length >= 2) {
+        this.mode = 'pinch';
+        this.lastDist = touchDist(e.touches);
+      } else {
+        this.mode = 'rotate';
+        this.lastX = e.touches[0].clientX;
+        this.lastY = e.touches[0].clientY;
       }
-    });
+    };
+
+    this.onTouchMove = (e) => {
+      if (!this.activeModel || !this.mode) return;
+      e.preventDefault();
+
+      // Dois dedos: SÓ zoom, nunca rotaciona
+      if (e.touches.length >= 2) {
+        const d = touchDist(e.touches);
+        if (this.mode !== 'pinch' || this.lastDist === 0) {
+          this.mode = 'pinch';
+          this.lastDist = d;
+          return;
+        }
+        this.applyZoom(d / this.lastDist);
+        this.lastDist = d;
+        return;
+      }
+
+
+      const t = e.touches[0];
+      if (this.mode === 'pinch') {
+
+        this.mode = 'rotate';
+        this.lastX = t.clientX;
+        this.lastY = t.clientY;
+        return;
+      }
+
+      const deltaX = t.clientX - this.lastX;
+      const deltaY = t.clientY - this.lastY;
+
+      this.activeModel.rotateY(deltaX * 0.01);
+      this.activeModel.rotateX(deltaY * 0.01);
+
+      this.lastX = t.clientX;
+      this.lastY = t.clientY;
+    };
+
+    this.onTouchEnd = (e) => {
+      if (e.touches.length === 0) {
+        this.mode = null;
+        this.lastDist = 0;
+      } else if (e.touches.length === 1) {
+        this.mode = 'rotate';
+        this.lastX = e.touches[0].clientX;
+        this.lastY = e.touches[0].clientY;
+        this.lastDist = 0;
+      }
+    };
+
+
+    this.onWheel = (e) => {
+      if (!this.activeModel) return;
+      e.preventDefault();
+      this.applyZoom(e.deltaY < 0 ? 1.1 : 0.9);
+    };
+
+    this.attachControls = () => {
+      scene.querySelectorAll('a-marker').forEach((marker) => {
+        const model = marker.querySelector('[gltf-model]');
+        if (!model) return;
+
+        const rotationTarget =
+          model.parentEl && model.parentEl.hasAttribute('data-pivot')
+            ? model.parentEl.object3D
+            : model.object3D;
+
+        const originalScale = rotationTarget.scale.x;
+
+        marker.addEventListener('markerFound', () => {
+          this.activeModel = rotationTarget;
+          this.baseScale = originalScale;
+        });
+
+        marker.addEventListener('markerLost', () => {
+          if (this.activeModel === rotationTarget) {
+            this.activeModel = null;
+            this.mode = null;
+            this.lastDist = 0;
+          }
+        });
+      });
+
+      const opts = { passive: false };
+      document.addEventListener('touchstart', this.onTouchStart, opts);
+      document.addEventListener('touchmove', this.onTouchMove, opts);
+      document.addEventListener('touchend', this.onTouchEnd, opts);
+      document.addEventListener('touchcancel', this.onTouchEnd, opts);
+      window.addEventListener('wheel', this.onWheel, opts);
+    };
+
+    if (scene.hasLoaded) {
+      this.attachControls();
+    } else {
+      scene.addEventListener('loaded', this.attachControls, { once: true });
+    }
+  }
+});
 
 
     function fitCamera() {
@@ -234,7 +231,7 @@
       <a-entity
         data-pivot
         position="0 0 0"
-        scale="0.17 0.17 0.17">
+        scale="0.10 0.10 0.10">
 
         <a-entity
           position="0 0 0"
