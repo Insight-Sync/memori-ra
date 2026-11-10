@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
 
+  <!-- Viewport fixo em 980px: imita o "site para computador" do Android -->
   <meta name="viewport" content="width=980, user-scalable=no">
 
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
@@ -14,10 +15,13 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #000;
+      background: transparent;
       touch-action: none;
     }
-
+    a-scene canvas {
+      background: transparent !important;
+    }
+    /* Esconde o botão VR do A-Frame */
     .a-enter-vr, .a-enter-ar {
       display: none !important;
     }
@@ -47,142 +51,143 @@
     });
 
     AFRAME.registerComponent('drag-rotate-active-marker', {
-  init: function () {
-    const scene = this.el;
+      init: function () {
+        const scene = this.el;
 
-    this.activeModel = null;
-    this.baseScale = 1;
-    this.mode = null; 
-    this.lastX = 0;
-    this.lastY = 0;
-    this.lastDist = 0;
-
-    const MIN_ZOOM = 0.3; 
-    const MAX_ZOOM = 5;   
-
-    const touchDist = (t) =>
-      Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-
-    this.applyZoom = (factor) => {
-      if (!this.activeModel) return;
-      let next = this.activeModel.scale.x * factor;
-      next = Math.min(this.baseScale * MAX_ZOOM, Math.max(this.baseScale * MIN_ZOOM, next));
-      this.activeModel.scale.setScalar(next);
-    };
-
-    this.onTouchStart = (e) => {
-      if (!this.activeModel) return;
-      e.preventDefault();
-
-      if (e.touches.length >= 2) {
-        this.mode = 'pinch';
-        this.lastDist = touchDist(e.touches);
-      } else {
-        this.mode = 'rotate';
-        this.lastX = e.touches[0].clientX;
-        this.lastY = e.touches[0].clientY;
-      }
-    };
-
-    this.onTouchMove = (e) => {
-      if (!this.activeModel || !this.mode) return;
-      e.preventDefault();
-
-      // Dois dedos: SÓ zoom, nunca rotaciona
-      if (e.touches.length >= 2) {
-        const d = touchDist(e.touches);
-        if (this.mode !== 'pinch' || this.lastDist === 0) {
-          this.mode = 'pinch';
-          this.lastDist = d;
-          return;
-        }
-        this.applyZoom(d / this.lastDist);
-        this.lastDist = d;
-        return;
-      }
-
-
-      const t = e.touches[0];
-      if (this.mode === 'pinch') {
-
-        this.mode = 'rotate';
-        this.lastX = t.clientX;
-        this.lastY = t.clientY;
-        return;
-      }
-
-      const deltaX = t.clientX - this.lastX;
-      const deltaY = t.clientY - this.lastY;
-
-      this.activeModel.rotateY(deltaX * 0.01);
-      this.activeModel.rotateX(deltaY * 0.01);
-
-      this.lastX = t.clientX;
-      this.lastY = t.clientY;
-    };
-
-    this.onTouchEnd = (e) => {
-      if (e.touches.length === 0) {
-        this.mode = null;
+        this.activeModel = null;
+        this.baseScale = 1;
+        this.mode = null; // 'rotate' ou 'pinch'
+        this.lastX = 0;
+        this.lastY = 0;
         this.lastDist = 0;
-      } else if (e.touches.length === 1) {
-        this.mode = 'rotate';
-        this.lastX = e.touches[0].clientX;
-        this.lastY = e.touches[0].clientY;
-        this.lastDist = 0;
-      }
-    };
 
+        const MIN_ZOOM = 0.3; // 30% do tamanho original
+        const MAX_ZOOM = 5;   // 500% do tamanho original
 
-    this.onWheel = (e) => {
-      if (!this.activeModel) return;
-      e.preventDefault();
-      this.applyZoom(e.deltaY < 0 ? 1.1 : 0.9);
-    };
+        const touchDist = (t) =>
+          Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
 
-    this.attachControls = () => {
-      scene.querySelectorAll('a-marker').forEach((marker) => {
-        const model = marker.querySelector('[gltf-model]');
-        if (!model) return;
+        this.applyZoom = (factor) => {
+          if (!this.activeModel) return;
+          let next = this.activeModel.scale.x * factor;
+          next = Math.min(this.baseScale * MAX_ZOOM, Math.max(this.baseScale * MIN_ZOOM, next));
+          this.activeModel.scale.setScalar(next);
+        };
 
-        const rotationTarget =
-          model.parentEl && model.parentEl.hasAttribute('data-pivot')
-            ? model.parentEl.object3D
-            : model.object3D;
+        this.onTouchStart = (e) => {
+          if (!this.activeModel) return;
+          e.preventDefault();
 
-        const originalScale = rotationTarget.scale.x;
+          if (e.touches.length >= 2) {
+            this.mode = 'pinch';
+            this.lastDist = touchDist(e.touches);
+          } else {
+            this.mode = 'rotate';
+            this.lastX = e.touches[0].clientX;
+            this.lastY = e.touches[0].clientY;
+          }
+        };
 
-        marker.addEventListener('markerFound', () => {
-          this.activeModel = rotationTarget;
-          this.baseScale = originalScale;
-        });
+        this.onTouchMove = (e) => {
+          if (!this.activeModel || !this.mode) return;
+          e.preventDefault();
 
-        marker.addEventListener('markerLost', () => {
-          if (this.activeModel === rotationTarget) {
-            this.activeModel = null;
+          // Dois dedos: SÓ zoom, nunca rotaciona
+          if (e.touches.length >= 2) {
+            const d = touchDist(e.touches);
+            if (this.mode !== 'pinch' || this.lastDist === 0) {
+              this.mode = 'pinch';
+              this.lastDist = d;
+              return;
+            }
+            this.applyZoom(d / this.lastDist);
+            this.lastDist = d;
+            return;
+          }
+
+          // Um dedo: rotação
+          const t = e.touches[0];
+          if (this.mode === 'pinch') {
+            // acabou de soltar um dedo: recomeça a rotação sem "pulo"
+            this.mode = 'rotate';
+            this.lastX = t.clientX;
+            this.lastY = t.clientY;
+            return;
+          }
+
+          const deltaX = t.clientX - this.lastX;
+          const deltaY = t.clientY - this.lastY;
+
+          this.activeModel.rotateY(deltaX * 0.01);
+          this.activeModel.rotateX(deltaY * 0.01);
+
+          this.lastX = t.clientX;
+          this.lastY = t.clientY;
+        };
+
+        this.onTouchEnd = (e) => {
+          if (e.touches.length === 0) {
             this.mode = null;
             this.lastDist = 0;
+          } else if (e.touches.length === 1) {
+            this.mode = 'rotate';
+            this.lastX = e.touches[0].clientX;
+            this.lastY = e.touches[0].clientY;
+            this.lastDist = 0;
           }
-        });
-      });
+        };
 
-      const opts = { passive: false };
-      document.addEventListener('touchstart', this.onTouchStart, opts);
-      document.addEventListener('touchmove', this.onTouchMove, opts);
-      document.addEventListener('touchend', this.onTouchEnd, opts);
-      document.addEventListener('touchcancel', this.onTouchEnd, opts);
-      window.addEventListener('wheel', this.onWheel, opts);
-    };
+        // Roda do mouse (computador)
+        this.onWheel = (e) => {
+          if (!this.activeModel) return;
+          e.preventDefault();
+          this.applyZoom(e.deltaY < 0 ? 1.1 : 0.9);
+        };
 
-    if (scene.hasLoaded) {
-      this.attachControls();
-    } else {
-      scene.addEventListener('loaded', this.attachControls, { once: true });
-    }
-  }
-});
+        this.attachControls = () => {
+          scene.querySelectorAll('a-marker').forEach((marker) => {
+            const model = marker.querySelector('[gltf-model]');
+            if (!model) return;
 
+            const rotationTarget =
+              model.parentEl && model.parentEl.hasAttribute('data-pivot')
+                ? model.parentEl.object3D
+                : model.object3D;
 
+            const originalScale = rotationTarget.scale.x;
+
+            marker.addEventListener('markerFound', () => {
+              this.activeModel = rotationTarget;
+              this.baseScale = originalScale;
+            });
+
+            marker.addEventListener('markerLost', () => {
+              if (this.activeModel === rotationTarget) {
+                this.activeModel = null;
+                this.mode = null;
+                this.lastDist = 0;
+              }
+            });
+          });
+
+          const opts = { passive: false };
+          document.addEventListener('touchstart', this.onTouchStart, opts);
+          document.addEventListener('touchmove', this.onTouchMove, opts);
+          document.addEventListener('touchend', this.onTouchEnd, opts);
+          document.addEventListener('touchcancel', this.onTouchEnd, opts);
+          window.addEventListener('wheel', this.onWheel, opts);
+        };
+
+        if (scene.hasLoaded) {
+          this.attachControls();
+        } else {
+          scene.addEventListener('loaded', this.attachControls, { once: true });
+        }
+      }
+    });
+
+    // Centraliza vídeo da câmera e canvas 3D com o MESMO tamanho (modo "cover"),
+    // para o marcador ficar alinhado com a imagem e no meio da tela.
     function fitCamera() {
       const video = document.getElementById('arjs-video');
       const canvas = document.querySelector('a-scene canvas');
@@ -203,8 +208,13 @@
         el.style.setProperty('height', h + 'px', 'important');
         el.style.setProperty('transform', 'translate(-50%, -50%)', 'important');
       });
+
+      // Vídeo da câmera atrás, canvas 3D na frente
+      video.style.setProperty('z-index', '0', 'important');
+      canvas.style.setProperty('z-index', '1', 'important');
     }
 
+    // O AR.js reescreve esses estilos quando redimensiona, então reaplicamos de tempos em tempos
     setInterval(fitCamera, 300);
     window.addEventListener('resize', () => setTimeout(fitCamera, 100));
     window.addEventListener('orientationchange', () => setTimeout(fitCamera, 500));
@@ -222,7 +232,7 @@
     vr-mode-ui="enabled: false"
     renderer="logarithmicDepthBuffer: true; alpha: true;">
 
- 
+    <!-- Modelagem KKKK -->
     <a-marker
       type="pattern"
       url="./pattern-kkkk.patt"
@@ -231,7 +241,7 @@
       <a-entity
         data-pivot
         position="0 0 0"
-        scale="0.10 0.10 0.10">
+        scale="0.08 0.08 0.08">
 
         <a-entity
           position="0 0 0"
@@ -242,7 +252,7 @@
       </a-entity>
     </a-marker>
 
-
+    <!-- Modelagem Mascote -->
     <a-marker
       type="pattern"
       url="./pattern-mascote.patt"
@@ -255,7 +265,7 @@
       </a-entity>
     </a-marker>
 
-
+    <!-- Modelagem Guaracuí -->
     <a-marker
       type="pattern"
       url="./pattern-Guaracui.patt"
