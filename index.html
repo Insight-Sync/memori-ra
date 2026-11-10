@@ -14,8 +14,9 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
+      background: #000;
     }
-    /* Esconde o botão VR do A-Frame */
+
     .a-enter-vr, .a-enter-ar {
       display: none !important;
     }
@@ -49,22 +50,64 @@
         const scene = this.el;
 
         this.activeModel = null;
+        this.baseScale = 1;
         this.dragging = false;
+        this.pointers = new Map();
+        this.lastPinchDist = 0;
+
+        const MIN_ZOOM = 0.3; 
+        const MAX_ZOOM = 5;   
+
+        this.applyZoom = (factor) => {
+          if (!this.activeModel) return;
+          const current = this.activeModel.scale.x;
+          let next = current * factor;
+          next = Math.min(this.baseScale * MAX_ZOOM, Math.max(this.baseScale * MIN_ZOOM, next));
+          this.activeModel.scale.setScalar(next);
+        };
+
+        this.pinchDistance = () => {
+          const pts = Array.from(this.pointers.values());
+          return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        };
 
         this.onDown = (event) => {
           if (!this.activeModel) return;
 
-          this.dragging = true;
-          this.lastX = event.clientX;
-          this.lastY = event.clientY;
+          this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+          if (this.pointers.size === 1) {
+            this.dragging = true;
+            this.lastX = event.clientX;
+            this.lastY = event.clientY;
+          } else if (this.pointers.size === 2) {
+            this.dragging = false;
+            this.lastPinchDist = this.pinchDistance();
+          }
           event.preventDefault();
         };
 
         this.onMove = (event) => {
-          if (!this.dragging || !this.activeModel) return;
+          if (!this.activeModel || !this.pointers.has(event.pointerId)) return;
+
+          this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+
+          if (this.pointers.size >= 2) {
+            const dist = this.pinchDistance();
+            if (this.lastPinchDist > 0) {
+              this.applyZoom(dist / this.lastPinchDist);
+            }
+            this.lastPinchDist = dist;
+            return;
+          }
+
+
+          if (!this.dragging) return;
 
           const deltaX = event.clientX - this.lastX;
           const deltaY = event.clientY - this.lastY;
+
 
           this.activeModel.rotateY(deltaX * 0.01);
           this.activeModel.rotateX(deltaY * 0.01);
@@ -73,8 +116,26 @@
           this.lastY = event.clientY;
         };
 
-        this.onUp = () => {
-          this.dragging = false;
+        this.onUp = (event) => {
+          this.pointers.delete(event.pointerId);
+
+          if (this.pointers.size === 1) {
+
+            const p = Array.from(this.pointers.values())[0];
+            this.lastX = p.x;
+            this.lastY = p.y;
+            this.dragging = true;
+          } else if (this.pointers.size === 0) {
+            this.dragging = false;
+          }
+          this.lastPinchDist = 0;
+        };
+
+
+        this.onWheel = (event) => {
+          if (!this.activeModel) return;
+          event.preventDefault();
+          this.applyZoom(event.deltaY < 0 ? 1.1 : 0.9);
         };
 
         this.attachControls = () => {
@@ -87,14 +148,20 @@
                 ? model.parentEl.object3D
                 : model.object3D;
 
+
+            const originalScale = rotationTarget.scale.x;
+
             marker.addEventListener('markerFound', () => {
               this.activeModel = rotationTarget;
+              this.baseScale = originalScale;
             });
 
             marker.addEventListener('markerLost', () => {
               if (this.activeModel === rotationTarget) {
                 this.activeModel = null;
                 this.dragging = false;
+                this.pointers.clear();
+                this.lastPinchDist = 0;
               }
             });
           });
@@ -104,6 +171,7 @@
 
           canvas.style.touchAction = 'none';
           canvas.addEventListener('pointerdown', this.onDown);
+          canvas.addEventListener('wheel', this.onWheel, { passive: false });
           window.addEventListener('pointermove', this.onMove);
           window.addEventListener('pointerup', this.onUp);
           window.addEventListener('pointercancel', this.onUp);
@@ -117,13 +185,34 @@
       }
     });
 
-    window.addEventListener('camera-init', () => {
-      [300, 800, 1500, 3000].forEach((ms) => {
-        setTimeout(() => window.dispatchEvent(new Event('resize')), ms);
+
+    function fitCamera() {
+      const video = document.getElementById('arjs-video');
+      const canvas = document.querySelector('a-scene canvas');
+      if (!video || !canvas || !video.videoWidth || !video.videoHeight) return;
+
+      const sw = window.innerWidth;
+      const sh = window.innerHeight;
+      const scale = Math.max(sw / video.videoWidth, sh / video.videoHeight);
+      const w = video.videoWidth * scale;
+      const h = video.videoHeight * scale;
+
+      [video, canvas].forEach((el) => {
+        el.style.setProperty('position', 'fixed', 'important');
+        el.style.setProperty('top', '50%', 'important');
+        el.style.setProperty('left', '50%', 'important');
+        el.style.setProperty('margin', '0', 'important');
+        el.style.setProperty('width', w + 'px', 'important');
+        el.style.setProperty('height', h + 'px', 'important');
+        el.style.setProperty('transform', 'translate(-50%, -50%)', 'important');
       });
-    });
-    window.addEventListener('orientationchange', () => {
-      setTimeout(() => window.dispatchEvent(new Event('resize')), 500);
+    }
+
+    setInterval(fitCamera, 300);
+    window.addEventListener('resize', () => setTimeout(fitCamera, 100));
+    window.addEventListener('orientationchange', () => setTimeout(fitCamera, 500));
+    window.addEventListener('camera-init', () => {
+      [300, 800, 1500, 3000].forEach((ms) => setTimeout(fitCamera, ms));
     });
   </script>
 </head>
@@ -136,6 +225,7 @@
     vr-mode-ui="enabled: false"
     renderer="logarithmicDepthBuffer: true; alpha: true;">
 
+ 
     <a-marker
       type="pattern"
       url="./pattern-kkkk.patt"
@@ -155,6 +245,7 @@
       </a-entity>
     </a-marker>
 
+
     <a-marker
       type="pattern"
       url="./pattern-mascote.patt"
@@ -166,6 +257,7 @@
         gltf-model="./mascote/2441948.gltf">
       </a-entity>
     </a-marker>
+
 
     <a-marker
       type="pattern"
