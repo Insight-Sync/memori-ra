@@ -2,10 +2,24 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta name="viewport" content="width=980, user-scalable=no">
 
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    /* Esconde o botão VR do A-Frame */
+    .a-enter-vr, .a-enter-ar {
+      display: none !important;
+    }
+  </style>
 
   <script>
     AFRAME.registerComponent('center-gltf-in-pivot', {
@@ -52,8 +66,6 @@
           const deltaX = event.clientX - this.lastX;
           const deltaY = event.clientY - this.lastY;
 
-          // Arrastar para os lados gira no eixo Y.
-          // Arrastar para cima ou para baixo gira no eixo X.
           this.activeModel.rotateY(deltaX * 0.01);
           this.activeModel.rotateX(deltaY * 0.01);
 
@@ -104,18 +116,26 @@
         }
       }
     });
+
+    window.addEventListener('camera-init', () => {
+      [300, 800, 1500, 3000].forEach((ms) => {
+        setTimeout(() => window.dispatchEvent(new Event('resize')), ms);
+      });
+    });
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => window.dispatchEvent(new Event('resize')), 500);
+    });
   </script>
 </head>
 
-<body style="margin: 0; overflow: hidden;">
+<body>
   <a-scene
     embedded
     drag-rotate-active-marker
     arjs="sourceType: webcam; debugUIEnabled: false;"
     vr-mode-ui="enabled: false"
-    renderer="logarithmicDepthBuffer: true;">
+    renderer="logarithmicDepthBuffer: true; alpha: true;">
 
-    <!-- Modelagem KKKK -->
     <a-marker
       type="pattern"
       url="./pattern-kkkk.patt"
@@ -135,7 +155,6 @@
       </a-entity>
     </a-marker>
 
-    <!-- Modelagem Mascote -->
     <a-marker
       type="pattern"
       url="./pattern-mascote.patt"
@@ -148,7 +167,6 @@
       </a-entity>
     </a-marker>
 
-    <!-- Modelagem Guaracuí -->
     <a-marker
       type="pattern"
       url="./pattern-Guaracui.patt"
