@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
 
-  <!-- Viewport fixo em 980px: imita o "site para computador" do Android -->
+
   <meta name="viewport" content="width=980, user-scalable=no">
 
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
@@ -15,19 +15,47 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: transparent;
+      background: transparent !important;
       touch-action: none;
+    }
+    a-scene {
+      background: transparent !important;
     }
     a-scene canvas {
       background: transparent !important;
     }
-    /* Esconde o botão VR do A-Frame */
-    .a-enter-vr, .a-enter-ar {
+
+    .a-enter-vr {
+      position: fixed !important;
+      right: 8px !important;
+      bottom: 8px !important;
+      z-index: 9999 !important;
+      transform: scale(0.6);
+      transform-origin: bottom right;
+    }
+    .a-enter-ar {
       display: none !important;
     }
   </style>
 
   <script>
+
+    AFRAME.registerComponent('transparent-bg', {
+      init: function () {
+        this.apply = () => {
+          const r = this.el.renderer;
+          if (!r) return;
+          r.setClearColor(0x000000, 0);
+          r.setClearAlpha(0);
+          this.el.object3D.background = null;
+        };
+        this.el.addEventListener('renderstart', this.apply);
+      },
+      tick: function () {
+        this.apply();
+      }
+    });
+
     AFRAME.registerComponent('center-gltf-in-pivot', {
       init: function () {
         this.el.addEventListener('model-loaded', () => {
@@ -56,13 +84,13 @@
 
         this.activeModel = null;
         this.baseScale = 1;
-        this.mode = null; // 'rotate' ou 'pinch'
+        this.mode = null; 
         this.lastX = 0;
         this.lastY = 0;
         this.lastDist = 0;
 
-        const MIN_ZOOM = 0.3; // 30% do tamanho original
-        const MAX_ZOOM = 5;   // 500% do tamanho original
+        const MIN_ZOOM = 0.3; 
+        const MAX_ZOOM = 5;   
 
         const touchDist = (t) =>
           Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
@@ -75,6 +103,8 @@
         };
 
         this.onTouchStart = (e) => {
+
+          if (e.target.closest && e.target.closest('.a-enter-vr')) return;
           if (!this.activeModel) return;
           e.preventDefault();
 
@@ -92,7 +122,6 @@
           if (!this.activeModel || !this.mode) return;
           e.preventDefault();
 
-          // Dois dedos: SÓ zoom, nunca rotaciona
           if (e.touches.length >= 2) {
             const d = touchDist(e.touches);
             if (this.mode !== 'pinch' || this.lastDist === 0) {
@@ -105,10 +134,8 @@
             return;
           }
 
-          // Um dedo: rotação
           const t = e.touches[0];
           if (this.mode === 'pinch') {
-            // acabou de soltar um dedo: recomeça a rotação sem "pulo"
             this.mode = 'rotate';
             this.lastX = t.clientX;
             this.lastY = t.clientY;
@@ -137,7 +164,6 @@
           }
         };
 
-        // Roda do mouse (computador)
         this.onWheel = (e) => {
           if (!this.activeModel) return;
           e.preventDefault();
@@ -186,8 +212,7 @@
       }
     });
 
-    // Centraliza vídeo da câmera e canvas 3D com o MESMO tamanho (modo "cover"),
-    // para o marcador ficar alinhado com a imagem e no meio da tela.
+
     function fitCamera() {
       const video = document.getElementById('arjs-video');
       const canvas = document.querySelector('a-scene canvas');
@@ -209,12 +234,13 @@
         el.style.setProperty('transform', 'translate(-50%, -50%)', 'important');
       });
 
-      // Vídeo da câmera atrás, canvas 3D na frente
+
       video.style.setProperty('z-index', '0', 'important');
+      video.style.setProperty('display', 'block', 'important');
+      video.style.setProperty('visibility', 'visible', 'important');
       canvas.style.setProperty('z-index', '1', 'important');
     }
 
-    // O AR.js reescreve esses estilos quando redimensiona, então reaplicamos de tempos em tempos
     setInterval(fitCamera, 300);
     window.addEventListener('resize', () => setTimeout(fitCamera, 100));
     window.addEventListener('orientationchange', () => setTimeout(fitCamera, 500));
@@ -227,12 +253,13 @@
 <body>
   <a-scene
     embedded
+    transparent-bg
     drag-rotate-active-marker
     arjs="sourceType: webcam; debugUIEnabled: false;"
-    vr-mode-ui="enabled: false"
-    renderer="logarithmicDepthBuffer: true; alpha: true;">
+    vr-mode-ui="enabled: true"
+    renderer="alpha: true; antialias: true;">
 
-    <!-- Modelagem KKKK -->
+
     <a-marker
       type="pattern"
       url="./pattern-kkkk.patt"
@@ -241,7 +268,7 @@
       <a-entity
         data-pivot
         position="0 0 0"
-        scale="0.08 0.08 0.08">
+        scale="0.10 0.10 0.10">
 
         <a-entity
           position="0 0 0"
@@ -252,7 +279,7 @@
       </a-entity>
     </a-marker>
 
-    <!-- Modelagem Mascote -->
+
     <a-marker
       type="pattern"
       url="./pattern-mascote.patt"
@@ -265,7 +292,7 @@
       </a-entity>
     </a-marker>
 
-    <!-- Modelagem Guaracuí -->
+
     <a-marker
       type="pattern"
       url="./pattern-Guaracui.patt"
