@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=980, user-scalable=no">
 
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 
   <style>
     html, body {
@@ -13,27 +13,23 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: transparent !important;
+      background: transparent;
       touch-action: none;
     }
     a-scene {
       position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
+      top: 0;
+      left: 0;
       width: 100% !important;
       height: 100% !important;
-      margin: 0 !important;
-      z-index: 1 !important;
       background: transparent !important;
     }
     a-scene canvas {
       background: transparent !important;
     }
     .a-enter-vr {
-      position: fixed !important;
       right: 8px !important;
       bottom: 8px !important;
-      z-index: 9999 !important;
       transform: scale(0.6);
       transform-origin: bottom right;
     }
@@ -43,23 +39,6 @@
   </style>
 
   <script>
-    AFRAME.registerComponent('transparent-bg', {
-      init: function () {
-        this.apply = () => {
-          const r = this.el.renderer;
-          if (!r) return;
-          r.setClearColor(0x000000, 0);
-          this.el.object3D.background = null;
-        };
-        this.el.addEventListener('renderstart', this.apply);
-        this.el.addEventListener('loaded', this.apply);
-        window.addEventListener('resize', () => setTimeout(this.apply, 150));
-        window.addEventListener('camera-init', () => {
-          [300, 800, 1500, 3000].forEach((ms) => setTimeout(this.apply, ms));
-        });
-      }
-    });
-
     AFRAME.registerComponent('center-gltf-in-pivot', {
       init: function () {
         this.el.addEventListener('model-loaded', () => {
@@ -93,17 +72,14 @@
         this.lastY = 0;
         this.lastDist = 0;
 
-        const MIN_ZOOM = 0.3;
-        const MAX_ZOOM = 5;
-
         const touchDist = (t) =>
           Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
 
         this.applyZoom = (factor) => {
-          if (!this.activeModel) return;
-          let next = this.activeModel.scale.x * factor;
-          next = Math.min(this.baseScale * MAX_ZOOM, Math.max(this.baseScale * MIN_ZOOM, next));
-          this.activeModel.scale.setScalar(next);
+          const next = this.activeModel.scale.x * factor;
+          const min = this.baseScale * 0.3;
+          const max = this.baseScale * 5;
+          this.activeModel.scale.setScalar(Math.min(max, Math.max(min, next)));
         };
 
         this.onTouchStart = (e) => {
@@ -127,12 +103,10 @@
 
           if (e.touches.length >= 2) {
             const d = touchDist(e.touches);
-            if (this.mode !== 'pinch' || this.lastDist === 0) {
-              this.mode = 'pinch';
-              this.lastDist = d;
-              return;
+            if (this.mode === 'pinch' && this.lastDist > 0) {
+              this.applyZoom(d / this.lastDist);
             }
-            this.applyZoom(d / this.lastDist);
+            this.mode = 'pinch';
             this.lastDist = d;
             return;
           }
@@ -145,32 +119,22 @@
             return;
           }
 
-          const deltaX = t.clientX - this.lastX;
-          const deltaY = t.clientY - this.lastY;
-
-          this.activeModel.rotateY(deltaX * 0.01);
-          this.activeModel.rotateX(deltaY * 0.01);
+          this.activeModel.rotateY((t.clientX - this.lastX) * 0.01);
+          this.activeModel.rotateX((t.clientY - this.lastY) * 0.01);
 
           this.lastX = t.clientX;
           this.lastY = t.clientY;
         };
 
         this.onTouchEnd = (e) => {
+          this.lastDist = 0;
           if (e.touches.length === 0) {
             this.mode = null;
-            this.lastDist = 0;
           } else if (e.touches.length === 1) {
             this.mode = 'rotate';
             this.lastX = e.touches[0].clientX;
             this.lastY = e.touches[0].clientY;
-            this.lastDist = 0;
           }
-        };
-
-        this.onWheel = (e) => {
-          if (!this.activeModel) return;
-          e.preventDefault();
-          this.applyZoom(e.deltaY < 0 ? 1.1 : 0.9);
         };
 
         this.attachControls = () => {
@@ -204,7 +168,6 @@
           document.addEventListener('touchmove', this.onTouchMove, opts);
           document.addEventListener('touchend', this.onTouchEnd, opts);
           document.addEventListener('touchcancel', this.onTouchEnd, opts);
-          window.addEventListener('wheel', this.onWheel, opts);
         };
 
         if (scene.hasLoaded) {
@@ -218,48 +181,43 @@
     function fitCamera() {
       const video = document.getElementById('arjs-video');
       const canvas = document.querySelector('a-scene canvas');
-      if (!video || !canvas || !video.videoWidth || !video.videoHeight) return;
+      if (!video || !canvas || !video.videoWidth) return;
 
-      const sw = window.innerWidth;
-      const sh = window.innerHeight;
-      const scale = Math.max(sw / video.videoWidth, sh / video.videoHeight);
-      const w = video.videoWidth * scale;
-      const h = video.videoHeight * scale;
+      const scale = Math.max(
+        window.innerWidth / video.videoWidth,
+        window.innerHeight / video.videoHeight
+      );
+      const w = video.videoWidth * scale + 'px';
+      const h = video.videoHeight * scale + 'px';
 
       [video, canvas].forEach((el) => {
         el.style.setProperty('position', 'fixed', 'important');
         el.style.setProperty('top', '50%', 'important');
         el.style.setProperty('left', '50%', 'important');
         el.style.setProperty('margin', '0', 'important');
-        el.style.setProperty('width', w + 'px', 'important');
-        el.style.setProperty('height', h + 'px', 'important');
+        el.style.setProperty('width', w, 'important');
+        el.style.setProperty('height', h, 'important');
         el.style.setProperty('transform', 'translate(-50%, -50%)', 'important');
       });
 
       video.style.setProperty('z-index', '0', 'important');
-      video.style.setProperty('display', 'block', 'important');
-      video.style.setProperty('visibility', 'visible', 'important');
-      video.style.setProperty('background', 'transparent', 'important');
+      canvas.style.setProperty('z-index', '1', 'important');
     }
 
-    setInterval(fitCamera, 300);
-    window.addEventListener('resize', () => setTimeout(fitCamera, 100));
-    window.addEventListener('orientationchange', () => setTimeout(fitCamera, 500));
-    window.addEventListener('camera-init', () => {
-      [300, 800, 1500, 3000].forEach((ms) => setTimeout(fitCamera, ms));
-    });
+    const scheduleFit = () => [100, 500, 1500, 3000].forEach((ms) => setTimeout(fitCamera, ms));
+    window.addEventListener('camera-init', scheduleFit);
+    window.addEventListener('resize', scheduleFit);
+    window.addEventListener('orientationchange', scheduleFit);
   </script>
 </head>
 
 <body>
   <a-scene
     embedded
-    transparent-bg
     drag-rotate-active-marker
-    background="transparent: true"
     arjs="sourceType: webcam; debugUIEnabled: false;"
     vr-mode-ui="enabled: true"
-    renderer="alpha: true; antialias: true;">
+    renderer="logarithmicDepthBuffer: true; alpha: true;">
 
     <a-marker
       type="pattern"
