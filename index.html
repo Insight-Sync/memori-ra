@@ -102,21 +102,6 @@
       }
     });
 
-    AFRAME.registerComponent('load-gltf-on-marker', {
-      init: function () {
-        const marker = this.el;
-        const model = marker.querySelector('[data-gltf-src]');
-        if (!model) return;
-
-        marker.addEventListener('markerFound', () => {
-          if (model.hasAttribute('gltf-model')) return;
-
-          const source = model.getAttribute('data-gltf-src');
-          if (source) model.setAttribute('gltf-model', source);
-        });
-      }
-    });
-
     AFRAME.registerComponent('drag-rotate-active-marker', {
       init: function () {
         const scene = this.el;
@@ -211,7 +196,7 @@
 
         this.attachControls = () => {
           scene.querySelectorAll('a-marker').forEach((marker) => {
-            const model = marker.querySelector('[data-gltf-src], [gltf-model]');
+            const model = marker.querySelector('[gltf-model]');
             if (!model) return;
 
             const rotationTarget =
@@ -289,9 +274,7 @@ AFRAME.registerComponent('screen-fixed', {
 
     const fit = () => {
       if (fitted) return;
-      const gltfEl = child.matches('[data-gltf-src], [gltf-model]')
-        ? child
-        : child.querySelector('[data-gltf-src], [gltf-model]');
+      const gltfEl = child.hasAttribute('gltf-model') ? child : child.querySelector('[gltf-model]');
       const content = gltfEl && gltfEl.getObject3D('mesh');
       if (!content) return;
 
@@ -346,18 +329,9 @@ AFRAME.registerComponent('screen-fixed', {
       }, 450);
     });
 
-    const gltfElement = child.matches('[data-gltf-src], [gltf-model]')
-      ? child
-      : child.querySelector('[data-gltf-src], [gltf-model]');
-
-    if (gltfElement) {
-      gltfElement.addEventListener('model-loaded', () => {
-        if (attached) {
-          fit();
-          show();
-        }
-      });
-    }
+    marker.addEventListener('model-loaded', () => {
+      if (attached) { fit(); show(); }
+    });
   }
 });
 
@@ -379,7 +353,6 @@ AFRAME.registerComponent('screen-fixed', {
       type="pattern"
       url="./pattern-kkkk.patt"
       emitevents="true"
-      load-gltf-on-marker
       screen-fixed>
 
       <a-entity
@@ -389,7 +362,7 @@ AFRAME.registerComponent('screen-fixed', {
 
         <a-entity
           position="0 0 0"
-          data-gltf-src="./kkkk/scene.gltf"
+          gltf-model="./kkkk/scene.gltf"
           center-gltf-in-pivot>
         </a-entity>
 
@@ -401,13 +374,12 @@ AFRAME.registerComponent('screen-fixed', {
       type="pattern"
       url="./pattern-mascote.patt"
       emitevents="true"
-      load-gltf-on-marker
       screen-fixed>
 
       <a-entity
         position="0 0 0"
         scale="4 4 4"
-        data-gltf-src="./mascote/2441948.gltf">
+        gltf-model="./mascote/2441948.gltf">
       </a-entity>
     </a-marker>
 
@@ -416,13 +388,12 @@ AFRAME.registerComponent('screen-fixed', {
       type="pattern"
       url="./pattern-Guaracui.patt"
       emitevents="true"
-      load-gltf-on-marker
       screen-fixed>
 
       <a-entity
         position="0 0 0"
         scale="0.20 0.20 0.20"
-        data-gltf-src="./guaracui/2441949.gltf">
+        gltf-model="./guaracui/2441949.gltf">
       </a-entity>
     </a-marker>
 
