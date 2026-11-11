@@ -212,8 +212,11 @@
       }
     });
 
-    AFRAME.registerComponent('screen-fixed', {
-  schema: { distance: { default: 3 } },
+AFRAME.registerComponent('screen-fixed', {
+  schema: {
+    distance: { default: 3 },   
+    size: { default: 0.5 }     
+  },
 
   init: function () {
     const marker = this.el;
@@ -222,46 +225,78 @@
     if (!child) return;
 
     const obj = child.object3D;
-    const isPivot = child.hasAttribute('data-pivot');
     const holder = new THREE.Group();
     let attached = false;
-    let centered = isPivot; 
+    let fitted = false;
+    let found = false;
 
     const attach = () => {
       const camEl = scene.querySelector('[camera]');
       if (!camEl) return false;
       holder.position.set(0, 0, -this.data.distance);
       camEl.object3D.add(holder);
-      holder.add(obj); 
+      holder.add(obj);
       attached = true;
       return true;
     };
+  
+    const syncZoomBase = () => {
+      setTimeout(() => {
+        const d = scene.components['drag-rotate-active-marker'];
+        if (d && d.activeModel === obj) d.baseScale = obj.scale.x;
+      }, 0);
+    };
 
-    const centerMesh = () => {
-      const mesh = child.getObject3D('mesh');
-      if (!mesh) return;
-      holder.updateMatrixWorld(true);
-      obj.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(mesh);
-      const centerLocal = obj.worldToLocal(box.getCenter(new THREE.Vector3()));
-      mesh.position.sub(centerLocal);
-      centered = true;
+    const fit = () => {
+      if (fitted) return;
+      const gltfEl = child.hasAttribute('gltf-model') ? child : child.querySelector('[gltf-model]');
+      const content = gltfEl && gltfEl.getObject3D('mesh');
+      if (!content) return;
+
+      obj.updateWorldMatrix(true, true);
+      const box = new THREE.Box3().setFromObject(content, true);
+      box.applyMatrix4(new THREE.Matrix4().copy(obj.matrixWorld).invert());
+
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (!isFinite(maxDim) || maxDim === 0) return;
+
+      content.position.sub(center);
+
+      const e = scene.camera.projectionMatrix.elements;
+      const rect = scene.canvas.getBoundingClientRect();
+      const fracW = Math.min(1, window.innerWidth / rect.width);
+      const fracH = Math.min(1, window.innerHeight / rect.height);
+      const visW = (2 * this.data.distance / e[0]) * fracW;
+      const visH = (2 * this.data.distance / e[5]) * fracH;
+      const target = Math.min(visW, visH) * this.data.size;
+
+      obj.scale.setScalar(target / maxDim);
+      fitted = true;
+    };
+
+    const show = () => {
+      obj.visible = found && fitted;
+      if (obj.visible) syncZoomBase();
     };
 
     obj.visible = false;
 
     marker.addEventListener('markerFound', () => {
+      found = true;
       if (!attached && !attach()) return;
-      if (!centered) centerMesh();
-      obj.visible = true;
+      fit();
+      show();
     });
 
     marker.addEventListener('markerLost', () => {
+      found = false;
       obj.visible = false;
     });
 
-    child.addEventListener('model-loaded', () => {
-      if (attached && !centered) centerMesh();
+    marker.addEventListener('model-loaded', () => {
+      if (attached) { fit(); show(); }
     });
   }
 });
