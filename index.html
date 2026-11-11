@@ -254,7 +254,7 @@ AFRAME.registerComponent('screen-fixed', {
       if (!content) return;
 
       obj.updateWorldMatrix(true, true);
-      const box = new THREE.Box3().setFromObject(content, true);
+      const box = new THREE.Box3().setFromObject(content);
       box.applyMatrix4(new THREE.Matrix4().copy(obj.matrixWorld).invert());
 
       const center = box.getCenter(new THREE.Vector3());
