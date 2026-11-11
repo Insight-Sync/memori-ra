@@ -2,6 +2,8 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+
+
   <meta name="viewport" content="width=980, user-scalable=no">
 
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
@@ -13,11 +15,21 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
+      background: transparent !important;
       touch-action: none;
     }
+    a-scene {
+      background: transparent !important;
+    }
+    a-scene canvas {
+      background: transparent !important;
+    }
+
     .a-enter-vr {
+      position: fixed !important;
       right: 8px !important;
       bottom: 8px !important;
+      z-index: 9999 !important;
       transform: scale(0.6);
       transform-origin: bottom right;
     }
@@ -27,6 +39,23 @@
   </style>
 
   <script>
+
+    AFRAME.registerComponent('transparent-bg', {
+      init: function () {
+        this.apply = () => {
+          const r = this.el.renderer;
+          if (!r) return;
+          r.setClearColor(0x000000, 0);
+          r.setClearAlpha(0);
+          this.el.object3D.background = null;
+        };
+        this.el.addEventListener('renderstart', this.apply);
+      },
+      tick: function () {
+        this.apply();
+      }
+    });
+
     AFRAME.registerComponent('center-gltf-in-pivot', {
       init: function () {
         this.el.addEventListener('model-loaded', () => {
@@ -55,13 +84,13 @@
 
         this.activeModel = null;
         this.baseScale = 1;
-        this.mode = null;
+        this.mode = null; 
         this.lastX = 0;
         this.lastY = 0;
         this.lastDist = 0;
 
-        const MIN_ZOOM = 0.3;
-        const MAX_ZOOM = 5;
+        const MIN_ZOOM = 0.3; 
+        const MAX_ZOOM = 5;   
 
         const touchDist = (t) =>
           Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
@@ -74,6 +103,7 @@
         };
 
         this.onTouchStart = (e) => {
+
           if (e.target.closest && e.target.closest('.a-enter-vr')) return;
           if (!this.activeModel) return;
           e.preventDefault();
@@ -112,8 +142,11 @@
             return;
           }
 
-          this.activeModel.rotateY((t.clientX - this.lastX) * 0.01);
-          this.activeModel.rotateX((t.clientY - this.lastY) * 0.01);
+          const deltaX = t.clientX - this.lastX;
+          const deltaY = t.clientY - this.lastY;
+
+          this.activeModel.rotateY(deltaX * 0.01);
+          this.activeModel.rotateX(deltaY * 0.01);
 
           this.lastX = t.clientX;
           this.lastY = t.clientY;
@@ -129,6 +162,12 @@
             this.lastY = e.touches[0].clientY;
             this.lastDist = 0;
           }
+        };
+
+        this.onWheel = (e) => {
+          if (!this.activeModel) return;
+          e.preventDefault();
+          this.applyZoom(e.deltaY < 0 ? 1.1 : 0.9);
         };
 
         this.attachControls = () => {
@@ -162,6 +201,7 @@
           document.addEventListener('touchmove', this.onTouchMove, opts);
           document.addEventListener('touchend', this.onTouchEnd, opts);
           document.addEventListener('touchcancel', this.onTouchEnd, opts);
+          window.addEventListener('wheel', this.onWheel, opts);
         };
 
         if (scene.hasLoaded) {
@@ -172,13 +212,40 @@
       }
     });
 
-    window.addEventListener('camera-init', () => {
-      [300, 800, 1500, 3000].forEach((ms) => {
-        setTimeout(() => window.dispatchEvent(new Event('resize')), ms);
+
+    function fitCamera() {
+      const video = document.getElementById('arjs-video');
+      const canvas = document.querySelector('a-scene canvas');
+      if (!video || !canvas || !video.videoWidth || !video.videoHeight) return;
+
+      const sw = window.innerWidth;
+      const sh = window.innerHeight;
+      const scale = Math.max(sw / video.videoWidth, sh / video.videoHeight);
+      const w = video.videoWidth * scale;
+      const h = video.videoHeight * scale;
+
+      [video, canvas].forEach((el) => {
+        el.style.setProperty('position', 'fixed', 'important');
+        el.style.setProperty('top', '50%', 'important');
+        el.style.setProperty('left', '50%', 'important');
+        el.style.setProperty('margin', '0', 'important');
+        el.style.setProperty('width', w + 'px', 'important');
+        el.style.setProperty('height', h + 'px', 'important');
+        el.style.setProperty('transform', 'translate(-50%, -50%)', 'important');
       });
-    });
-    window.addEventListener('orientationchange', () => {
-      setTimeout(() => window.dispatchEvent(new Event('resize')), 500);
+
+
+      video.style.setProperty('z-index', '0', 'important');
+      video.style.setProperty('display', 'block', 'important');
+      video.style.setProperty('visibility', 'visible', 'important');
+      canvas.style.setProperty('z-index', '1', 'important');
+    }
+
+    setInterval(fitCamera, 300);
+    window.addEventListener('resize', () => setTimeout(fitCamera, 100));
+    window.addEventListener('orientationchange', () => setTimeout(fitCamera, 500));
+    window.addEventListener('camera-init', () => {
+      [300, 800, 1500, 3000].forEach((ms) => setTimeout(fitCamera, ms));
     });
   </script>
 </head>
@@ -186,10 +253,12 @@
 <body>
   <a-scene
     embedded
+    transparent-bg
     drag-rotate-active-marker
     arjs="sourceType: webcam; debugUIEnabled: false;"
     vr-mode-ui="enabled: true"
-    renderer="logarithmicDepthBuffer: true; alpha: true;">
+    renderer="alpha: true; antialias: true;">
+
 
     <a-marker
       type="pattern"
@@ -210,6 +279,7 @@
       </a-entity>
     </a-marker>
 
+
     <a-marker
       type="pattern"
       url="./pattern-mascote.patt"
@@ -221,6 +291,7 @@
         gltf-model="./mascote/2441948.gltf">
       </a-entity>
     </a-marker>
+
 
     <a-marker
       type="pattern"
