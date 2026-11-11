@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=980, user-scalable=no">
 
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
 
   <style>
     html, body {
@@ -13,19 +13,7 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: transparent;
       touch-action: none;
-    }
-    a-scene {
-      position: fixed !important;
-      top: 0;
-      left: 0;
-      width: 100% !important;
-      height: 100% !important;
-      background: transparent !important;
-    }
-    a-scene canvas {
-      background: transparent !important;
     }
     .a-enter-vr {
       right: 8px !important;
@@ -72,14 +60,17 @@
         this.lastY = 0;
         this.lastDist = 0;
 
+        const MIN_ZOOM = 0.3;
+        const MAX_ZOOM = 5;
+
         const touchDist = (t) =>
           Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
 
         this.applyZoom = (factor) => {
-          const next = this.activeModel.scale.x * factor;
-          const min = this.baseScale * 0.3;
-          const max = this.baseScale * 5;
-          this.activeModel.scale.setScalar(Math.min(max, Math.max(min, next)));
+          if (!this.activeModel) return;
+          let next = this.activeModel.scale.x * factor;
+          next = Math.min(this.baseScale * MAX_ZOOM, Math.max(this.baseScale * MIN_ZOOM, next));
+          this.activeModel.scale.setScalar(next);
         };
 
         this.onTouchStart = (e) => {
@@ -103,10 +94,12 @@
 
           if (e.touches.length >= 2) {
             const d = touchDist(e.touches);
-            if (this.mode === 'pinch' && this.lastDist > 0) {
-              this.applyZoom(d / this.lastDist);
+            if (this.mode !== 'pinch' || this.lastDist === 0) {
+              this.mode = 'pinch';
+              this.lastDist = d;
+              return;
             }
-            this.mode = 'pinch';
+            this.applyZoom(d / this.lastDist);
             this.lastDist = d;
             return;
           }
@@ -127,13 +120,14 @@
         };
 
         this.onTouchEnd = (e) => {
-          this.lastDist = 0;
           if (e.touches.length === 0) {
             this.mode = null;
+            this.lastDist = 0;
           } else if (e.touches.length === 1) {
             this.mode = 'rotate';
             this.lastX = e.touches[0].clientX;
             this.lastY = e.touches[0].clientY;
+            this.lastDist = 0;
           }
         };
 
@@ -178,36 +172,14 @@
       }
     });
 
-    function fitCamera() {
-      const video = document.getElementById('arjs-video');
-      const canvas = document.querySelector('a-scene canvas');
-      if (!video || !canvas || !video.videoWidth) return;
-
-      const scale = Math.max(
-        window.innerWidth / video.videoWidth,
-        window.innerHeight / video.videoHeight
-      );
-      const w = video.videoWidth * scale + 'px';
-      const h = video.videoHeight * scale + 'px';
-
-      [video, canvas].forEach((el) => {
-        el.style.setProperty('position', 'fixed', 'important');
-        el.style.setProperty('top', '50%', 'important');
-        el.style.setProperty('left', '50%', 'important');
-        el.style.setProperty('margin', '0', 'important');
-        el.style.setProperty('width', w, 'important');
-        el.style.setProperty('height', h, 'important');
-        el.style.setProperty('transform', 'translate(-50%, -50%)', 'important');
+    window.addEventListener('camera-init', () => {
+      [300, 800, 1500, 3000].forEach((ms) => {
+        setTimeout(() => window.dispatchEvent(new Event('resize')), ms);
       });
-
-      video.style.setProperty('z-index', '0', 'important');
-      canvas.style.setProperty('z-index', '1', 'important');
-    }
-
-    const scheduleFit = () => [100, 500, 1500, 3000].forEach((ms) => setTimeout(fitCamera, ms));
-    window.addEventListener('camera-init', scheduleFit);
-    window.addEventListener('resize', scheduleFit);
-    window.addEventListener('orientationchange', scheduleFit);
+    });
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => window.dispatchEvent(new Event('resize')), 500);
+    });
   </script>
 </head>
 
