@@ -212,6 +212,60 @@
       }
     });
 
+    AFRAME.registerComponent('screen-fixed', {
+  schema: { distance: { default: 3 } },
+
+  init: function () {
+    const marker = this.el;
+    const scene = marker.sceneEl;
+    const child = marker.querySelector(':scope > a-entity');
+    if (!child) return;
+
+    const obj = child.object3D;
+    const isPivot = child.hasAttribute('data-pivot');
+    const holder = new THREE.Group();
+    let attached = false;
+    let centered = isPivot; 
+
+    const attach = () => {
+      const camEl = scene.querySelector('[camera]');
+      if (!camEl) return false;
+      holder.position.set(0, 0, -this.data.distance);
+      camEl.object3D.add(holder);
+      holder.add(obj); 
+      attached = true;
+      return true;
+    };
+
+    const centerMesh = () => {
+      const mesh = child.getObject3D('mesh');
+      if (!mesh) return;
+      holder.updateMatrixWorld(true);
+      obj.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(mesh);
+      const centerLocal = obj.worldToLocal(box.getCenter(new THREE.Vector3()));
+      mesh.position.sub(centerLocal);
+      centered = true;
+    };
+
+    obj.visible = false;
+
+    marker.addEventListener('markerFound', () => {
+      if (!attached && !attach()) return;
+      if (!centered) centerMesh();
+      obj.visible = true;
+    });
+
+    marker.addEventListener('markerLost', () => {
+      obj.visible = false;
+    });
+
+    child.addEventListener('model-loaded', () => {
+      if (attached && !centered) centerMesh();
+    });
+  }
+});
+
 
     function fitCamera() {
       const video = document.getElementById('arjs-video');
@@ -263,7 +317,8 @@
     <a-marker
       type="pattern"
       url="./pattern-kkkk.patt"
-      emitevents="true">
+      emitevents="true"
+      screen-fixed>
 
       <a-entity
         data-pivot
@@ -283,7 +338,8 @@
     <a-marker
       type="pattern"
       url="./pattern-mascote.patt"
-      emitevents="true">
+      emitevents="true"
+      screen-fixed>
 
       <a-entity
         position="0 0 0"
@@ -296,7 +352,8 @@
     <a-marker
       type="pattern"
       url="./pattern-Guaracui.patt"
-      emitevents="true">
+      emitevents="true"
+      screen-fixed>
 
       <a-entity
         position="0 0 0"
