@@ -2,9 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-
-
-  <meta name="viewport" content="width=980, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
@@ -18,9 +16,8 @@
       background: transparent !important;
       touch-action: none;
     }
-    a-scene {
-      background: transparent !important;
-    }
+
+    a-scene,
     a-scene canvas {
       background: transparent !important;
     }
@@ -33,24 +30,27 @@
       transform: scale(0.6);
       transform-origin: bottom right;
     }
+
     .a-enter-ar {
       display: none !important;
     }
   </style>
 
   <script>
-
     AFRAME.registerComponent('transparent-bg', {
       init: function () {
         this.apply = () => {
-          const r = this.el.renderer;
-          if (!r) return;
-          r.setClearColor(0x000000, 0);
-          r.setClearAlpha(0);
+          const renderer = this.el.renderer;
+          if (!renderer) return;
+
+          renderer.setClearColor(0x000000, 0);
+          renderer.setClearAlpha(0);
           this.el.object3D.background = null;
         };
+
         this.el.addEventListener('renderstart', this.apply);
       },
+
       tick: function () {
         this.apply();
       }
@@ -84,90 +84,103 @@
 
         this.activeModel = null;
         this.baseScale = 1;
-        this.mode = null; 
+        this.mode = null;
         this.lastX = 0;
         this.lastY = 0;
         this.lastDist = 0;
 
-        const MIN_ZOOM = 0.3; 
-        const MAX_ZOOM = 5;   
+        const MIN_ZOOM = 0.3;
+        const MAX_ZOOM = 5;
 
-        const touchDist = (t) =>
-          Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+        const touchDist = (touches) =>
+          Math.hypot(
+            touches[0].clientX - touches[1].clientX,
+            touches[0].clientY - touches[1].clientY
+          );
 
         this.applyZoom = (factor) => {
           if (!this.activeModel) return;
+
           let next = this.activeModel.scale.x * factor;
-          next = Math.min(this.baseScale * MAX_ZOOM, Math.max(this.baseScale * MIN_ZOOM, next));
+          next = Math.min(
+            this.baseScale * MAX_ZOOM,
+            Math.max(this.baseScale * MIN_ZOOM, next)
+          );
+
           this.activeModel.scale.setScalar(next);
         };
 
-        this.onTouchStart = (e) => {
-
-          if (e.target.closest && e.target.closest('.a-enter-vr')) return;
+        this.onTouchStart = (event) => {
+          if (event.target.closest && event.target.closest('.a-enter-vr')) return;
           if (!this.activeModel) return;
-          e.preventDefault();
 
-          if (e.touches.length >= 2) {
+          event.preventDefault();
+
+          if (event.touches.length >= 2) {
             this.mode = 'pinch';
-            this.lastDist = touchDist(e.touches);
+            this.lastDist = touchDist(event.touches);
           } else {
             this.mode = 'rotate';
-            this.lastX = e.touches[0].clientX;
-            this.lastY = e.touches[0].clientY;
+            this.lastX = event.touches[0].clientX;
+            this.lastY = event.touches[0].clientY;
           }
         };
 
-        this.onTouchMove = (e) => {
+        this.onTouchMove = (event) => {
           if (!this.activeModel || !this.mode) return;
-          e.preventDefault();
 
-          if (e.touches.length >= 2) {
-            const d = touchDist(e.touches);
+          event.preventDefault();
+
+          if (event.touches.length >= 2) {
+            const distance = touchDist(event.touches);
+
             if (this.mode !== 'pinch' || this.lastDist === 0) {
               this.mode = 'pinch';
-              this.lastDist = d;
+              this.lastDist = distance;
               return;
             }
-            this.applyZoom(d / this.lastDist);
-            this.lastDist = d;
+
+            this.applyZoom(distance / this.lastDist);
+            this.lastDist = distance;
             return;
           }
 
-          const t = e.touches[0];
+          const touch = event.touches[0];
+
           if (this.mode === 'pinch') {
             this.mode = 'rotate';
-            this.lastX = t.clientX;
-            this.lastY = t.clientY;
+            this.lastX = touch.clientX;
+            this.lastY = touch.clientY;
             return;
           }
 
-          const deltaX = t.clientX - this.lastX;
-          const deltaY = t.clientY - this.lastY;
+          const deltaX = touch.clientX - this.lastX;
+          const deltaY = touch.clientY - this.lastY;
 
           this.activeModel.rotateY(deltaX * 0.01);
           this.activeModel.rotateX(deltaY * 0.01);
 
-          this.lastX = t.clientX;
-          this.lastY = t.clientY;
+          this.lastX = touch.clientX;
+          this.lastY = touch.clientY;
         };
 
-        this.onTouchEnd = (e) => {
-          if (e.touches.length === 0) {
+        this.onTouchEnd = (event) => {
+          if (event.touches.length === 0) {
             this.mode = null;
             this.lastDist = 0;
-          } else if (e.touches.length === 1) {
+          } else if (event.touches.length === 1) {
             this.mode = 'rotate';
-            this.lastX = e.touches[0].clientX;
-            this.lastY = e.touches[0].clientY;
+            this.lastX = event.touches[0].clientX;
+            this.lastY = event.touches[0].clientY;
             this.lastDist = 0;
           }
         };
 
-        this.onWheel = (e) => {
+        this.onWheel = (event) => {
           if (!this.activeModel) return;
-          e.preventDefault();
-          this.applyZoom(e.deltaY < 0 ? 1.1 : 0.9);
+
+          event.preventDefault();
+          this.applyZoom(event.deltaY < 0 ? 1.1 : 0.9);
         };
 
         this.attachControls = () => {
@@ -196,12 +209,13 @@
             });
           });
 
-          const opts = { passive: false };
-          document.addEventListener('touchstart', this.onTouchStart, opts);
-          document.addEventListener('touchmove', this.onTouchMove, opts);
-          document.addEventListener('touchend', this.onTouchEnd, opts);
-          document.addEventListener('touchcancel', this.onTouchEnd, opts);
-          window.addEventListener('wheel', this.onWheel, opts);
+          const options = { passive: false };
+
+          document.addEventListener('touchstart', this.onTouchStart, options);
+          document.addEventListener('touchmove', this.onTouchMove, options);
+          document.addEventListener('touchend', this.onTouchEnd, options);
+          document.addEventListener('touchcancel', this.onTouchEnd, options);
+          window.addEventListener('wheel', this.onWheel, options);
         };
 
         if (scene.hasLoaded) {
@@ -212,129 +226,235 @@
       }
     });
 
-AFRAME.registerComponent('screen-fixed', {
-  schema: {
-    distance: { default: 3 },   
-    size: { default: 0.5 }     
-  },
+    AFRAME.registerComponent('screen-fixed', {
+      schema: {
+        distance: { default: 3 },
+        size: { default: 0.5 }
+      },
 
-  init: function () {
-    const marker = this.el;
-    const scene = marker.sceneEl;
-    const child = marker.querySelector(':scope > a-entity');
-    if (!child) return;
+      init: function () {
+        const marker = this.el;
+        const scene = marker.sceneEl;
+        const child = marker.querySelector(':scope > a-entity');
 
-    const obj = child.object3D;
-    const holder = new THREE.Group();
-    let attached = false;
-    let fitted = false;
-    let found = false;
+        if (!child) return;
 
-    const attach = () => {
-      const camEl = scene.querySelector('[camera]');
-      if (!camEl) return false;
-      holder.position.set(0, 0, -this.data.distance);
-      camEl.object3D.add(holder);
-      holder.add(obj);
-      attached = true;
-      return true;
-    };
-  
-    const syncZoomBase = () => {
-      setTimeout(() => {
-        const d = scene.components['drag-rotate-active-marker'];
-        if (d && d.activeModel === obj) d.baseScale = obj.scale.x;
-      }, 0);
-    };
+        const obj = child.object3D;
+        const holder = new THREE.Group();
 
-    const fit = () => {
-      if (fitted) return;
-      const gltfEl = child.hasAttribute('gltf-model') ? child : child.querySelector('[gltf-model]');
-      const content = gltfEl && gltfEl.getObject3D('mesh');
-      if (!content) return;
+        let attached = false;
+        let fitted = false;
+        let found = false;
+        let lostTimer = null;
 
-      obj.updateWorldMatrix(true, true);
-      const box = new THREE.Box3().setFromObject(content);
-      box.applyMatrix4(new THREE.Matrix4().copy(obj.matrixWorld).invert());
+        const attach = () => {
+          const camera = scene.querySelector('[camera]');
+          if (!camera) return false;
 
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      if (!isFinite(maxDim) || maxDim === 0) return;
+          holder.position.set(0, 0, -this.data.distance);
+          camera.object3D.add(holder);
+          holder.add(obj);
+          attached = true;
 
-      content.position.sub(center);
+          return true;
+        };
 
-      const e = scene.camera.projectionMatrix.elements;
-      const rect = scene.canvas.getBoundingClientRect();
-      const fracW = Math.min(1, window.innerWidth / rect.width);
-      const fracH = Math.min(1, window.innerHeight / rect.height);
-      const visW = (2 * this.data.distance / e[0]) * fracW;
-      const visH = (2 * this.data.distance / e[5]) * fracH;
-      const target = Math.min(visW, visH) * this.data.size;
+        const syncZoomBase = () => {
+          setTimeout(() => {
+            const drag = scene.components['drag-rotate-active-marker'];
 
-      obj.scale.setScalar(target / maxDim);
-      fitted = true;
-    };
+            if (drag && drag.activeModel === obj) {
+              drag.baseScale = obj.scale.x;
+            }
+          }, 0);
+        };
 
-    const show = () => {
-      obj.visible = found && fitted;
-      if (obj.visible) syncZoomBase();
-    };
+        const fit = () => {
+          if (fitted) return;
 
-    obj.visible = false;
+          const gltfElement = child.hasAttribute('gltf-model')
+            ? child
+            : child.querySelector('[gltf-model]');
 
-    marker.addEventListener('markerFound', () => {
-      found = true;
-      if (!attached && !attach()) return;
-      fit();
-      show();
+          const content = gltfElement && gltfElement.getObject3D('mesh');
+          if (!content) return;
+
+          obj.updateWorldMatrix(true, true);
+
+          const box = new THREE.Box3().setFromObject(content);
+          box.applyMatrix4(
+            new THREE.Matrix4().copy(obj.matrixWorld).invert()
+          );
+
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+          const maxDimension = Math.max(size.x, size.y, size.z);
+
+          if (!isFinite(maxDimension) || maxDimension === 0) return;
+
+          content.position.sub(center);
+
+          const projection = scene.camera.projectionMatrix.elements;
+          const rect = scene.canvas.getBoundingClientRect();
+
+          const fractionWidth = Math.min(1, window.innerWidth / rect.width);
+          const fractionHeight = Math.min(1, window.innerHeight / rect.height);
+
+          const visibleWidth =
+            (2 * this.data.distance / projection[0]) * fractionWidth;
+          const visibleHeight =
+            (2 * this.data.distance / projection[5]) * fractionHeight;
+
+          const targetSize =
+            Math.min(visibleWidth, visibleHeight) * this.data.size;
+
+          obj.scale.setScalar(targetSize / maxDimension);
+          fitted = true;
+        };
+
+        const show = () => {
+          obj.visible = found && fitted;
+
+          if (obj.visible) {
+            syncZoomBase();
+          }
+        };
+
+        obj.visible = false;
+
+        marker.addEventListener('markerFound', () => {
+          if (lostTimer) {
+            clearTimeout(lostTimer);
+            lostTimer = null;
+          }
+
+          found = true;
+
+          if (!attached && !attach()) return;
+
+          fit();
+          show();
+        });
+
+        marker.addEventListener('markerLost', () => {
+          // Evita piscar quando o rastreamento perde o alvo por um instante.
+          if (lostTimer) clearTimeout(lostTimer);
+
+          lostTimer = setTimeout(() => {
+            found = false;
+            obj.visible = false;
+            lostTimer = null;
+          }, 450);
+        });
+
+        marker.addEventListener('model-loaded', () => {
+          if (attached) {
+            fit();
+            show();
+          }
+        });
+      }
     });
-
-    marker.addEventListener('markerLost', () => {
-      found = false;
-      obj.visible = false;
-    });
-
-    marker.addEventListener('model-loaded', () => {
-      if (attached) { fit(); show(); }
-    });
-  }
-});
-
 
     function fitCamera() {
       const video = document.getElementById('arjs-video');
       const canvas = document.querySelector('a-scene canvas');
+
       if (!video || !canvas || !video.videoWidth || !video.videoHeight) return;
 
-      const sw = window.innerWidth;
-      const sh = window.innerHeight;
-      const scale = Math.max(sw / video.videoWidth, sh / video.videoHeight);
-      const w = video.videoWidth * scale;
-      const h = video.videoHeight * scale;
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+      const scale = Math.max(
+        screenWidth / video.videoWidth,
+        screenHeight / video.videoHeight
+      );
 
-      [video, canvas].forEach((el) => {
-        el.style.setProperty('position', 'fixed', 'important');
-        el.style.setProperty('top', '50%', 'important');
-        el.style.setProperty('left', '50%', 'important');
-        el.style.setProperty('margin', '0', 'important');
-        el.style.setProperty('width', w + 'px', 'important');
-        el.style.setProperty('height', h + 'px', 'important');
-        el.style.setProperty('transform', 'translate(-50%, -50%)', 'important');
+      const width = video.videoWidth * scale;
+      const height = video.videoHeight * scale;
+
+      const setImportant = (element, property, value) => {
+        if (
+          element.style.getPropertyValue(property) !== value ||
+          element.style.getPropertyPriority(property) !== 'important'
+        ) {
+          element.style.setProperty(property, value, 'important');
+        }
+      };
+
+      [video, canvas].forEach((element) => {
+        setImportant(element, 'position', 'fixed');
+        setImportant(element, 'top', '50%');
+        setImportant(element, 'left', '50%');
+        setImportant(element, 'margin', '0');
+        setImportant(element, 'width', width + 'px');
+        setImportant(element, 'height', height + 'px');
+        setImportant(element, 'transform', 'translate(-50%, -50%)');
       });
 
-
-      video.style.setProperty('z-index', '0', 'important');
-      video.style.setProperty('display', 'block', 'important');
-      video.style.setProperty('visibility', 'visible', 'important');
-      canvas.style.setProperty('z-index', '1', 'important');
+      setImportant(video, 'z-index', '0');
+      setImportant(video, 'display', 'block');
+      setImportant(video, 'visibility', 'visible');
+      setImportant(canvas, 'z-index', '1');
     }
 
-    setInterval(fitCamera, 300);
-    window.addEventListener('resize', () => setTimeout(fitCamera, 100));
-    window.addEventListener('orientationchange', () => setTimeout(fitCamera, 500));
-    window.addEventListener('camera-init', () => {
-      [300, 800, 1500, 3000].forEach((ms) => setTimeout(fitCamera, ms));
+    let fitFrame = null;
+
+    function scheduleFitCamera() {
+      if (fitFrame !== null) {
+        cancelAnimationFrame(fitFrame);
+      }
+
+      fitFrame = requestAnimationFrame(() => {
+        fitFrame = null;
+        fitCamera();
+      });
+    }
+
+    function watchCameraVideo() {
+      const video = document.getElementById('arjs-video');
+      if (!video) return false;
+
+      video.addEventListener('loadedmetadata', scheduleFitCamera, { once: true });
+      video.addEventListener('playing', scheduleFitCamera, { once: true });
+
+      if (video.videoWidth && video.videoHeight) {
+        scheduleFitCamera();
+      }
+
+      return true;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const scene = document.querySelector('a-scene');
+
+      if (scene) {
+        scene.addEventListener('camera-init', scheduleFitCamera);
+        scene.addEventListener('renderstart', scheduleFitCamera);
+      }
+
+      window.addEventListener('camera-init', scheduleFitCamera);
+      window.addEventListener('resize', scheduleFitCamera, { passive: true });
+
+      window.addEventListener(
+        'orientationchange',
+        () => setTimeout(scheduleFitCamera, 300),
+        { passive: true }
+      );
+
+      if (!watchCameraVideo()) {
+        const observer = new MutationObserver(() => {
+          if (watchCameraVideo()) {
+            observer.disconnect();
+          }
+        });
+
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true
+        });
+
+        setTimeout(() => observer.disconnect(), 15000);
+      }
     });
   </script>
 </head>
@@ -346,9 +466,9 @@ AFRAME.registerComponent('screen-fixed', {
     drag-rotate-active-marker
     arjs="sourceType: webcam; debugUIEnabled: false;"
     vr-mode-ui="enabled: true"
-    renderer="alpha: true; antialias: true;">
+    renderer="alpha: true; antialias: false;">
 
-
+    <!-- Modelagem KKKK -->
     <a-marker
       type="pattern"
       url="./pattern-kkkk.patt"
@@ -369,7 +489,7 @@ AFRAME.registerComponent('screen-fixed', {
       </a-entity>
     </a-marker>
 
-
+    <!-- Modelagem Mascote -->
     <a-marker
       type="pattern"
       url="./pattern-mascote.patt"
@@ -383,7 +503,7 @@ AFRAME.registerComponent('screen-fixed', {
       </a-entity>
     </a-marker>
 
-
+    <!-- Modelagem Guaracuí -->
     <a-marker
       type="pattern"
       url="./pattern-Guaracui.patt"
